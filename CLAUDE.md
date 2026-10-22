@@ -57,6 +57,8 @@ otherwise.
 - `app/core/security.py` has password hashing and JWT creation and decoding.
 - `app/core/config.py` reads the environment.
 - `app/core/redis.py` builds the Redis client (`get_redis` dependency).
+- `app/core/sessions.py` is the Redis session store (ADR 0003): create, rotate
+  (atomic Lua script), check, revoke.
 - `app/models/`, `app/schemas/` hold SQLAlchemy models and Pydantic schemas.
 - `alembic/versions/` holds migrations. `docs/adr/` holds the decisions.
 - `tests/unit/` and `tests/integration/` (FastAPI `TestClient`).
@@ -91,19 +93,22 @@ otherwise.
 ## Current state
 
 Implemented: registration (user, organization and owner membership), login,
-refresh, the membership and permission checks, and `POST /tasks`. A Redis
-client, its docker-compose and CI services and the test fixtures also exist,
-but nothing in the application reads or writes Redis yet.
+the membership and permission checks, and `POST /tasks`. Login creates a
+session in Redis; access tokens are checked against it on every request;
+`POST /auth/refresh` takes the token in the JSON body, rotates it atomically,
+detects reuse (which ends the session) and never outlives the 30-day session.
+Authentication answers `503` when Redis is unavailable.
 
-Not implemented yet, so it must not be described as existing: reading,
-updating or deleting tasks, task assignment, audit log writes (the model
-exists, nothing writes to it), a README, sessions and token revocation (ADR
-0003 is only proposed), rate limiting, caching, background jobs and
+Not implemented yet, so it must not be described as existing: logout,
+validation of the `X-Organization-Id` header format, reading, updating or
+deleting tasks, task assignment, audit log writes (the model exists, nothing
+writes to it), a README, rate limiting, caching, background jobs and
 deployment.
 
 ## Known limitations
 
-- `POST /auth/refresh` takes the token as a query parameter, does not check
-  that the user still exists and does not issue a new refresh token.
+- If Redis restarts without persistence, every session is lost (ADR 0003).
+- A client that sends the same refresh request twice at once loses its
+  session, because the second one looks like reuse.
 - An `X-Organization-Id` that is not a UUID causes a server error.
 - The Docker image runs as root and does not run migrations on start.

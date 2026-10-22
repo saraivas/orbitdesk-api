@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed
+Accepted. Sessions, refresh rotation and fail-closed behaviour are
+implemented; logout and the header and `sub` validation listed under "Also in
+this change" are not yet.
 
 ## Context
 
@@ -27,8 +29,9 @@ claim is made here.
 **Sessions.** Logging in creates a session identified by a random `sid`,
 stored in Redis:
 
-- `orbitdesk:v1:session:{sid}` is a hash with the user id and the `jti` of the
-  refresh token currently allowed. It has a TTL of 30 days, set once at login
+- `orbitdesk:v1:session:{sid}` is a hash with the user id, the `jti` of the
+  refresh token currently allowed and the session end (`expires_at`, epoch
+  seconds, used to cap refresh tokens). It has a TTL of 30 days, set once at login
   and never extended, so a session ends 30 days after login.
 - `orbitdesk:v1:user:{user_id}:sessions` is a set of that user's `sid`s, used
   to end all of them.
