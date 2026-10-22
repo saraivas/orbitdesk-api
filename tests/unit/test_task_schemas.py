@@ -43,3 +43,9 @@ def test_task_update_rejects_blank_title_when_provided():
 def test_task_update_has_no_type_field():
     task = TaskUpdate(title="Novo título")
     assert not hasattr(task, "type")
+
+
+def test_task_create_blank_title_error_message():
+    with pytest.raises(ValidationError) as exc:
+        TaskCreate(title="   ")
+    assert "Title cannot be blank" in str(exc.value)
