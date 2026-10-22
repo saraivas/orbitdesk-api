@@ -144,6 +144,51 @@ def test_refresh_fails_and_ends_the_session_if_the_user_no_longer_exists(client,
     assert not redis_client.exists(SESSION_KEY.format(sid=claims(s["refresh"])["sid"]))
 
 
+# --- logout ------------------------------------------------------------------
+
+def login(client, email="owner@example.com"):
+    tokens = client.post("/auth/login", json={"email": email, "password": "senha123"}).json()
+    return tokens["access_token"], tokens["refresh_token"]
+
+
+def auth(access):
+    return {"Authorization": f"Bearer {access}"}
+
+
+def test_logout_ends_only_the_session_it_was_called_with(client, redis_client):
+    s = register_and_login(client)
+    other_access, other_refresh = login(client)  # a second device
+
+    assert client.post("/auth/logout", headers=auth(s["access"])).status_code == 204
+
+    assert create_task(client, s).status_code == 401
+    assert refresh(client, s["refresh"]).status_code == 401
+    sid = claims(s["access"])["sid"]
+    assert sid not in redis_client.smembers(USER_SESSIONS_KEY.format(user_id=s["user_id"]))
+    assert create_task(client, s, access=other_access).status_code == 201
+    assert refresh(client, other_refresh).status_code == 200
+
+
+def test_logging_out_twice_is_refused_the_second_time(client):
+    s = register_and_login(client)
+    assert client.post("/auth/logout", headers=auth(s["access"])).status_code == 204
+    assert client.post("/auth/logout", headers=auth(s["access"])).status_code == 401
+
+
+def test_logout_all_ends_every_session_of_the_caller_and_nobody_elses(client, redis_client):
+    a = register_and_login(client, email="a@example.com")
+    a2_access, a2_refresh = login(client, email="a@example.com")
+    b = register_and_login(client, email="b@example.com")
+
+    assert client.post("/auth/logout-all", headers=auth(a["access"])).status_code == 204
+
+    assert create_task(client, a).status_code == 401
+    assert create_task(client, a, access=a2_access).status_code == 401
+    assert refresh(client, a2_refresh).status_code == 401
+    assert not redis_client.exists(USER_SESSIONS_KEY.format(user_id=a["user_id"]))
+    assert create_task(client, b).status_code == 201
+
+
 # --- atomic rotation ---------------------------------------------------------
 
 def test_two_simultaneous_refreshes_with_the_same_token_cannot_both_win(redis_client):

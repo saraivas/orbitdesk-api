@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted. Sessions, refresh rotation and fail-closed behaviour are
-implemented; logout and the header and `sub` validation listed under "Also in
-this change" are not yet.
+Accepted. Sessions, refresh rotation, logout and fail-closed behaviour are
+implemented; the header and `sub` validation listed under "Also in this
+change" are not yet.
 
 ## Context
 

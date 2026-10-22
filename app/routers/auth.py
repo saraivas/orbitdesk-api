@@ -6,10 +6,12 @@ from app.core.sessions import (
     RotationStatus,
     create_session,
     new_id,
+    revoke_all_sessions,
     revoke_session,
     rotate_session,
 )
 from app.db.session import get_db
+from app.deps import get_access_payload
 from app.schemas.auth import RefreshRequest, TokenResponse
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse
@@ -135,3 +137,23 @@ def refresh(
         access_token=create_access_token(sub, sid),
         refresh_token=create_refresh_token(sub, sid, new_jti, rotation.expires_at),
     )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+    payload: dict = Depends(get_access_payload),
+    r: redis.Redis = Depends(get_redis),
+):
+    """End the session of the access token used for this call."""
+    revoke_session(r, payload["sid"], payload["sub"])
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/logout-all", status_code=status.HTTP_204_NO_CONTENT)
+def logout_all(
+    payload: dict = Depends(get_access_payload),
+    r: redis.Redis = Depends(get_redis),
+):
+    """End every session of the caller, on all devices."""
+    revoke_all_sessions(r, payload["sub"])
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

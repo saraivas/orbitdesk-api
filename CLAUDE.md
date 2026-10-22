@@ -97,10 +97,12 @@ the membership and permission checks, and `POST /tasks`. Login creates a
 session in Redis; access tokens are checked against it on every request;
 `POST /auth/refresh` takes the token in the JSON body, rotates it atomically,
 detects reuse (which ends the session) and never outlives the 30-day session.
-Authentication answers `503` when Redis is unavailable.
+`POST /auth/logout` ends the caller's session and `POST /auth/logout-all`
+ends all of the caller's sessions. Authentication answers `503` when Redis is
+unavailable.
 
-Not implemented yet, so it must not be described as existing: logout,
-validation of the `X-Organization-Id` header format, reading, updating or
+Not implemented yet, so it must not be described as existing: validation of
+the `X-Organization-Id` header format, reading, updating or
 deleting tasks, task assignment, audit log writes (the model exists, nothing
 writes to it), a README, rate limiting, caching, background jobs and
 deployment.
