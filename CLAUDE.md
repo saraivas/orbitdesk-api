@@ -30,17 +30,22 @@ description of current behaviour.
 
 ```bash
 cp .env.example .env
-docker compose up -d db                                       # Postgres on :5433
+docker compose up -d db redis                                 # Postgres on :5433, Redis on :6380
 docker compose exec db createdb -U orbitdesk orbitdesk_test   # once
 alembic upgrade head                                          # dev database
 uvicorn app.main:app --reload
-pytest                                                        # uses TEST_DATABASE_URL
+pytest                                                        # uses TEST_DATABASE_URL and TEST_REDIS_URL
 ```
 
 **Never point `TEST_DATABASE_URL` at a database you care about.** The test
 fixtures create and drop every table on each test. `tests/conftest.py` refuses
 to run unless the database name ends with `_test`. `DATABASE_URL` is the
 application's database and the tests do not use it.
+
+The same goes for Redis: the `redis_client` fixture flushes its whole database
+before and after each test, so `TEST_REDIS_URL` must use a database number
+other than 0 (the default is 15), and `tests/conftest.py` refuses to run
+otherwise.
 
 ## Layout
 
@@ -51,6 +56,7 @@ application's database and the tests do not use it.
 - `app/core/permissions.py` maps roles to permission strings (ADR 0002).
 - `app/core/security.py` has password hashing and JWT creation and decoding.
 - `app/core/config.py` reads the environment.
+- `app/core/redis.py` builds the Redis client (`get_redis` dependency).
 - `app/models/`, `app/schemas/` hold SQLAlchemy models and Pydantic schemas.
 - `alembic/versions/` holds migrations. `docs/adr/` holds the decisions.
 - `tests/unit/` and `tests/integration/` (FastAPI `TestClient`).
@@ -85,12 +91,15 @@ application's database and the tests do not use it.
 ## Current state
 
 Implemented: registration (user, organization and owner membership), login,
-refresh, the membership and permission checks, and `POST /tasks`.
+refresh, the membership and permission checks, and `POST /tasks`. A Redis
+client, its docker-compose and CI services and the test fixtures also exist,
+but nothing in the application reads or writes Redis yet.
 
 Not implemented yet, so it must not be described as existing: reading,
 updating or deleting tasks, task assignment, audit log writes (the model
-exists, nothing writes to it), a README, rate limiting, caching, background
-jobs and deployment.
+exists, nothing writes to it), a README, sessions and token revocation (ADR
+0003 is only proposed), rate limiting, caching, background jobs and
+deployment.
 
 ## Known limitations
 
