@@ -14,7 +14,7 @@ class TaskCreate(BaseModel):
     @classmethod
     def title_must_not_be_blank(cls, value: str) -> str:
         if not value.strip():
-            raise ValueError("Title canoot be blank")
+            raise ValueError("Title cannot be blank")
         return value.strip()
 
 
