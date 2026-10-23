@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import redis
@@ -11,6 +13,14 @@ from app.models.user import User
 from app.models.membership import Membership
 
 bearer_scheme = HTTPBearer()
+
+
+def _is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+    except ValueError:
+        return False
+    return True
 
 
 def get_access_payload(
@@ -27,6 +37,7 @@ def get_access_payload(
         or payload.get("type") != "access"
         or not isinstance(sid, str)
         or not isinstance(sub, str)
+        or not _is_uuid(sub)
         or not is_session_active(r, sid, sub)
     ):
         raise HTTPException(
@@ -54,7 +65,8 @@ def get_current_user(
 
 
 def get_current_membership(
-    x_organization_id: str = Header(..., alias="X-Organization-Id"),
+    # Typed as a UUID so a malformed value is a 422 instead of a database error.
+    x_organization_id: uuid.UUID = Header(..., alias="X-Organization-Id"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Membership:
