@@ -99,10 +99,10 @@ session in Redis; access tokens are checked against it on every request;
 detects reuse (which ends the session) and never outlives the 30-day session.
 `POST /auth/logout` ends the caller's session and `POST /auth/logout-all`
 ends all of the caller's sessions. Authentication answers `503` when Redis is
-unavailable.
+unavailable. An `X-Organization-Id` that is not a UUID is a `422`, and an
+access token whose `sub` is not a UUID is a `401`.
 
-Not implemented yet, so it must not be described as existing: validation of
-the `X-Organization-Id` header format, reading, updating or
+Not implemented yet, so it must not be described as existing: reading, updating or
 deleting tasks, task assignment, audit log writes (the model exists, nothing
 writes to it), a README, rate limiting, caching, background jobs and
 deployment.
@@ -112,5 +112,4 @@ deployment.
 - If Redis restarts without persistence, every session is lost (ADR 0003).
 - A client that sends the same refresh request twice at once loses its
   session, because the second one looks like reuse.
-- An `X-Organization-Id` that is not a UUID causes a server error.
 - The Docker image runs as root and does not run migrations on start.
