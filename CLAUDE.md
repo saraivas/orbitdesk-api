@@ -59,6 +59,8 @@ otherwise.
 - `app/core/redis.py` builds the Redis client (`get_redis` dependency).
 - `app/core/sessions.py` is the Redis session store (ADR 0003): create, rotate
   (atomic Lua script), check, revoke.
+- `app/core/audit.py` adds audit entries to the caller's transaction
+  (ADR 0002); it never commits.
 - `app/models/`, `app/schemas/` hold SQLAlchemy models and Pydantic schemas.
 - `alembic/versions/` holds migrations. `docs/adr/` holds the decisions.
 - `tests/unit/` and `tests/integration/` (FastAPI `TestClient`).
@@ -116,3 +118,7 @@ deployment.
 - A client that sends the same refresh request twice at once loses its
   session, because the second one looks like reuse.
 - The Docker image runs as root and does not run migrations on start.
+- The audit log has no visibility rules. An entry stores the task id and
+  `type: "confidential"`, so it reveals that a confidential task exists.
+  Nothing reads `AuditLog` today; any endpoint that does must apply the
+  confidential-task rules of ADR 0002 first.
