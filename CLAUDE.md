@@ -59,6 +59,8 @@ otherwise.
 - `app/core/redis.py` builds the Redis client (`get_redis` dependency).
 - `app/core/sessions.py` is the Redis session store (ADR 0003): create, rotate
   (atomic Lua script), check, revoke.
+- `app/core/audit.py` adds audit entries to the caller's transaction
+  (ADR 0002); it never commits.
 - `app/models/`, `app/schemas/` hold SQLAlchemy models and Pydantic schemas.
 - `alembic/versions/` holds migrations. `docs/adr/` holds the decisions.
 - `tests/unit/` and `tests/integration/` (FastAPI `TestClient`).
@@ -100,11 +102,14 @@ detects reuse (which ends the session) and never outlives the 30-day session.
 `POST /auth/logout` ends the caller's session and `POST /auth/logout-all`
 ends all of the caller's sessions. Authentication answers `503` when Redis is
 unavailable. An `X-Organization-Id` that is not a UUID is a `422`, and an
-access token whose `sub` is not a UUID is a `401`.
+access token whose `sub` is not a UUID is a `401`. `POST /tasks` writes a
+`task.created` audit entry in the same transaction as the task, through
+`record_audit` in `app/core/audit.py` (it adds, never commits); the entry
+keeps the task type, never the title.
 
 Not implemented yet, so it must not be described as existing: reading, updating or
-deleting tasks, task assignment, audit log writes (the model exists, nothing
-writes to it), a README, rate limiting, caching, background jobs and
+deleting tasks, task assignment, audit entries for any action other than
+`task.created`, a README, rate limiting, caching, background jobs and
 deployment.
 
 ## Known limitations
@@ -113,3 +118,7 @@ deployment.
 - A client that sends the same refresh request twice at once loses its
   session, because the second one looks like reuse.
 - The Docker image runs as root and does not run migrations on start.
+- The audit log has no visibility rules. An entry stores the task id and
+  `type: "confidential"`, so it reveals that a confidential task exists.
+  Nothing reads `AuditLog` today; any endpoint that does must apply the
+  confidential-task rules of ADR 0002 first.
