@@ -34,5 +34,5 @@ def headers(session, access=None):
     }
 
 
-def create_task(client, session, access=None):
-    return client.post("/tasks", json={"title": "t"}, headers=headers(session, access))
+def create_task(client, session, access=None, **body):
+    return client.post("/tasks", json={"title": "t", **body}, headers=headers(session, access))

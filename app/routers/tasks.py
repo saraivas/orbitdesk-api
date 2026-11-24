@@ -4,6 +4,7 @@ from app.db.session import get_db
 from app.deps import get_current_membership
 from app.models.membership import Membership
 from app.models.task import Task, TaskType
+from app.core.audit import record_audit
 from app.core.permissions import has_permission
 from app.schemas.task import TaskCreate, TaskResponse
 
@@ -34,6 +35,9 @@ def create_task(
         type=task_data.type,
     )
     db.add(new_task)
+    db.flush()  # assigns new_task.id for the audit entry
+    # The type only, never the title: the audit log has no visibility rules.
+    record_audit(db, membership, "task.created", "task", new_task.id, {"type": new_task.type.value})
     db.commit()
     db.refresh(new_task)
 
