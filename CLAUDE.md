@@ -37,6 +37,11 @@ uvicorn app.main:app --reload
 pytest                                                        # uses TEST_DATABASE_URL and TEST_REDIS_URL
 ```
 
+Test results for a pull request come from the `test` check of the CI
+workflow (`.github/workflows/ci.yml`), which runs `pytest` against real
+Postgres and Redis. The `@claude` review job has no database and cannot run
+the suite: read that check instead of treating the results as unverified.
+
 **Never point `TEST_DATABASE_URL` at a database you care about.** The test
 fixtures create and drop every table on each test. `tests/conftest.py` refuses
 to run unless the database name ends with `_test`. `DATABASE_URL` is the
