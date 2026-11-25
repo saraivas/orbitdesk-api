@@ -122,7 +122,8 @@ last owner can never be demoted or removed (`SELECT ... FOR UPDATE`, ADR
 
 Not implemented yet, so it must not be described as existing: updating or
 deleting tasks, assigning tasks, pending invitations, invitation emails,
-deleting an organization, audit entries other than `task.created` and the `member.*` actions, a README, rate limiting, caching, background jobs and
+deleting an organization, audit entries other than `task.created` and the
+`member.*` actions, a README, rate limiting, caching, background jobs and
 deployment.
 
 ## Known limitations
