@@ -1,19 +1,15 @@
-import uuid
-
 import pytest
 
 from app.models.membership import MembershipRole
-from app.models.task_assignment import TaskAssignment
-from tests.helpers import create_task, join_as, register_and_login
+from tests.helpers import create_task, headers, join_as, register_and_login
 
 
 @pytest.fixture
-def tasks_org(client, db_session):
+def tasks_org(client):
     """One organization with every visibility case of ADR 0002, plus a task in another organization.
 
     Only owners and admins can create confidential tasks, so a member reaches a
-    confidential task only by being assigned to it. There is no assignment
-    endpoint yet, so the assignment row is inserted directly.
+    confidential task only by being assigned to it.
     """
     owner = register_and_login(client, email="owner@example.com", org="A")
     admin = join_as(client, owner, MembershipRole.admin, email="admin@example.com")
@@ -31,11 +27,11 @@ def tasks_org(client, db_session):
         "confidential_assigned_to_m1": task(owner, "confidential_assigned_to_m1", "confidential"),
         "other_org": task(outsider, "other_org"),
     }
-    db_session.add(TaskAssignment(
-        task_id=uuid.UUID(tasks["confidential_assigned_to_m1"]),
-        user_id=uuid.UUID(m1["user_id"]),
-        assigned_by=uuid.UUID(owner["user_id"]),
-    ))
-    db_session.commit()
+    assigned = client.post(
+        f"/tasks/{tasks['confidential_assigned_to_m1']}/assignees",
+        json={"user_id": m1["user_id"]},
+        headers=headers(owner),
+    )
+    assert assigned.status_code == 201, assigned.text
 
     return {"owner": owner, "admin": admin, "m1": m1, "m2": m2, "tasks": tasks}
