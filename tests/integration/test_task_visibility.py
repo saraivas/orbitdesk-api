@@ -16,9 +16,9 @@ def org(client, db_session):
     endpoint yet, so the assignment row is inserted directly.
     """
     owner = register_and_login(client, email="owner@example.com", org="A")
-    admin = join_as(client, db_session, owner, MembershipRole.admin, email="admin@example.com")
-    m1 = join_as(client, db_session, owner, MembershipRole.member, email="m1@example.com")
-    m2 = join_as(client, db_session, owner, MembershipRole.member, email="m2@example.com")
+    admin = join_as(client, owner, MembershipRole.admin, email="admin@example.com")
+    m1 = join_as(client, owner, MembershipRole.member, email="m1@example.com")
+    m2 = join_as(client, owner, MembershipRole.member, email="m2@example.com")
     outsider = register_and_login(client, email="b@example.com", org="B")
 
     def task(session, title, type="standard"):

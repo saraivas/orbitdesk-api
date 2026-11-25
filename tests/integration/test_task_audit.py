@@ -24,10 +24,10 @@ def test_creating_a_task_writes_a_task_created_audit_entry(client, db_session):
 
 def test_a_refused_task_writes_no_audit_entry(client, db_session):
     owner = register_and_login(client)
-    member = join_as(client, db_session, owner, MembershipRole.member, email="m@example.com")
+    member = join_as(client, owner, MembershipRole.member, email="m@example.com")
 
     assert create_task(client, member, type="confidential").status_code == 403
-    assert db_session.query(AuditLog).count() == 0
+    assert db_session.query(AuditLog).filter_by(action="task.created").count() == 0
 
 
 def test_if_the_audit_write_fails_the_task_is_not_saved(client, monkeypatch):

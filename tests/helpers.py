@@ -1,6 +1,3 @@
-from app.models.membership import Membership
-
-
 def register_and_login(client, email="owner@example.com", password="senha123", org="Org"):
     """Register a user (with an organization) and log in. Returns the tokens and ids."""
     registered = client.post("/auth/register", json={
@@ -15,15 +12,14 @@ def register_and_login(client, email="owner@example.com", password="senha123", o
     }
 
 
-def join_as(client, db, owner, role, email):
+def join_as(client, owner, role, email):
     """Register another user and add them to `owner`'s organization with `role`.
 
-    There is no members endpoint yet, so the membership row is inserted directly.
     Returns a session dict scoped to `owner`'s organization.
     """
     other = register_and_login(client, email=email, org=f"{email} org")
-    db.add(Membership(user_id=other["user_id"], organization_id=owner["org_id"], role=role))
-    db.commit()
+    response = client.post("/members", json={"email": email, "role": role.value}, headers=headers(owner))
+    assert response.status_code == 201, response.text
     return {**other, "org_id": owner["org_id"]}
 
 

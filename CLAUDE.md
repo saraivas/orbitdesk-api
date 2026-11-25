@@ -55,7 +55,8 @@ otherwise.
 ## Layout
 
 - `app/main.py` creates the app and includes the routers.
-- `app/routers/auth.py`, `app/routers/tasks.py` hold the endpoints.
+- `app/routers/auth.py`, `app/routers/tasks.py`, `app/routers/members.py`
+  hold the endpoints.
 - `app/deps.py` has `get_current_user`, `get_current_membership` (reads the
   `X-Organization-Id` header, see ADR 0001) and `require_permission`.
 - `app/core/permissions.py` maps roles to permission strings (ADR 0002).
@@ -113,11 +114,16 @@ access token whose `sub` is not a UUID is a `401`. `POST /tasks` writes a
 keeps the task type, never the title. `GET /tasks` (with `limit`/`offset` and
 a `total`) and `GET /tasks/{id}` return only the tasks the caller may see:
 the rule is SQL in `visible_tasks`, shared by list, total and detail, and a
-hidden task is a `404` like a missing one (ADR 0004).
+hidden task is a `404` like a missing one (ADR 0004). `/members` lists,
+adds (auto-accept, existing accounts only), changes roles and removes
+members, and lets a member leave; an admin manages only `member`, and the
+last owner can never be demoted or removed (`SELECT ... FOR UPDATE`, ADR
+0005). Removing a member deletes their assignments in that organization.
 
 Not implemented yet, so it must not be described as existing: updating or
-deleting tasks, task assignment, audit entries for any action other than
-`task.created`, a README, rate limiting, caching, background jobs and
+deleting tasks, assigning tasks, pending invitations, invitation emails,
+deleting an organization, audit entries other than `task.created` and the
+`member.*` actions, a README, rate limiting, caching, background jobs and
 deployment.
 
 ## Known limitations
@@ -132,3 +138,6 @@ deployment.
   confidential-task rules of ADR 0002 first.
 - Task visibility is enforced in application code only (ADR 0004). Any new
   query on `tasks` must start from `visible_tasks`, or it bypasses the rule.
+- Adding a member with an email that has no account is a `404`, so anyone can
+  learn whether an email is registered (ADR 0005). Pending invitations would
+  close this.
