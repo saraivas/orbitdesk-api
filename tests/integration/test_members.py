@@ -8,7 +8,8 @@ from app.models.membership import Membership, MembershipRole
 from app.models.task_assignment import TaskAssignment
 from sqlalchemy.exc import IntegrityError
 
-from app.routers.members import count_owners_for_update, is_duplicate_member
+from app.db.errors import violates
+from app.routers.members import count_owners_for_update
 from tests.conftest import TestingSessionLocal
 from tests.helpers import create_task, headers, join_as, register_and_login
 
@@ -74,8 +75,9 @@ def test_only_the_membership_constraint_counts_as_already_a_member(db_session, o
         db_session.rollback()
         return raised.value
 
-    assert is_duplicate_member(integrity_error(uuid.UUID(org["member"]["user_id"])))
-    assert not is_duplicate_member(integrity_error(uuid.uuid4()))  # foreign key, not a duplicate
+    assert violates(integrity_error(uuid.UUID(org["member"]["user_id"])), "uq_user_organization")
+    # A foreign key failure is not a duplicate.
+    assert not violates(integrity_error(uuid.uuid4()), "uq_user_organization")
 
 
 @pytest.mark.parametrize(
@@ -145,12 +147,11 @@ def test_removing_a_member_deletes_their_assignments_in_that_organization_only(c
     member_id = uuid.UUID(org["member"]["user_id"])
     other = register_and_login(client, email="b@example.com", org="B")
     add(client, other, "member@example.com")
-    # No assignment endpoint yet, so the rows are inserted directly.
     for owner in (org["owner"], other):
         task_id = create_task(client, owner, type="confidential").json()["id"]
-        db_session.add(TaskAssignment(task_id=uuid.UUID(task_id), user_id=member_id,
-                                      assigned_by=uuid.UUID(owner["user_id"])))
-    db_session.commit()
+        assigned = client.post(f"/tasks/{task_id}/assignees", json={"user_id": str(member_id)},
+                               headers=headers(owner))
+        assert assigned.status_code == 201
 
     assert remove(client, org["owner"], org["member"]).status_code == 204
 

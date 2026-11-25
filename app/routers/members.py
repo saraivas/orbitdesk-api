@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.permissions import has_permission
+from app.db.errors import violates
 from app.db.session import get_db
 from app.deps import get_current_membership, require_permission
 from app.models.membership import Membership, MembershipRole
@@ -64,15 +65,6 @@ def get_target(db: Session, actor: Membership, user_id: uuid.UUID) -> Membership
     return target
 
 
-def is_duplicate_member(error: IntegrityError) -> bool:
-    """True only for the (user_id, organization_id) unique constraint.
-
-    A foreign-key failure, for example, must not be reported as "already a
-    member". The constraint name comes from the Postgres driver (psycopg2).
-    """
-    return getattr(error.orig.diag, "constraint_name", None) == "uq_user_organization"
-
-
 def to_response(membership: Membership, email: str) -> MemberResponse:
     return MemberResponse(
         user_id=membership.user_id, email=email, role=membership.role, created_at=membership.created_at
@@ -117,7 +109,7 @@ def add_member(
         # uq_user_organization decides, not a read before the insert: two
         # concurrent adds would both pass such a read (ADR 0005).
         db.rollback()
-        if not is_duplicate_member(error):
+        if not violates(error, "uq_user_organization"):
             raise  # any other integrity error is unexpected: let it be a 500
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already a member")
     record_audit(db, actor, "member.invited", "member", user.id, {"role": data.role.value})

@@ -2,14 +2,18 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import exists, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from app.db.errors import violates
 from app.db.session import get_db
 from app.deps import get_current_membership, require_permission
 from app.models.membership import Membership, MembershipRole
 from app.models.task import Task, TaskType
 from app.models.task_assignment import TaskAssignment
+from app.models.user import User
 from app.core.audit import record_audit
 from app.core.permissions import has_permission
+from app.schemas.assignee import AssigneeAdd, AssigneeResponse
 from app.schemas.task import TaskCreate, TaskPage, TaskResponse, TaskUpdate
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -152,5 +156,83 @@ def delete_task(
     # Hard delete: the audit log has no foreign key to tasks, so this entry stays.
     record_audit(db, membership, "task.deleted", "task", task.id, {"type": task.type.value})
     db.delete(task)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def get_assignable_task(db: Session, membership: Membership, task_id: uuid.UUID) -> Task:
+    """A task whose assignees the member may change: only its creator or the owner (ADR 0002).
+
+    Like editing, visibility comes first (404), then the right to assign (403).
+    """
+    task = get_visible_task(db, membership, task_id)
+    if not (membership.role == MembershipRole.owner or task.created_by == membership.user_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot assign on this task")
+    return task
+
+
+@router.get("/{task_id}/assignees", response_model=list[AssigneeResponse])
+def list_assignees(
+    task_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    membership: Membership = Depends(get_current_membership),
+):
+    task = get_visible_task(db, membership, task_id)
+    rows = (
+        db.query(TaskAssignment.user_id, User.email)
+        .join(User, User.id == TaskAssignment.user_id)
+        .filter(TaskAssignment.task_id == task.id)
+        .order_by(TaskAssignment.created_at, TaskAssignment.user_id)
+        .all()
+    )
+    return [AssigneeResponse(user_id=user_id, email=email) for user_id, email in rows]
+
+
+@router.post("/{task_id}/assignees", response_model=AssigneeResponse, status_code=status.HTTP_201_CREATED)
+def assign_task(
+    task_id: uuid.UUID,
+    data: AssigneeAdd,
+    db: Session = Depends(get_db),
+    membership: Membership = Depends(get_current_membership),
+):
+    task = get_assignable_task(db, membership, task_id)
+    # Assigning grants access to the task, so the assignee must belong to the
+    # same organization.
+    email = (
+        db.query(User.email)
+        .join(Membership, Membership.user_id == User.id)
+        .filter(User.id == data.user_id, Membership.organization_id == membership.organization_id)
+        .scalar()
+    )
+    if email is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+
+    db.add(TaskAssignment(task_id=task.id, user_id=data.user_id, assigned_by=membership.user_id))
+    try:
+        db.flush()
+    except IntegrityError as error:
+        db.rollback()
+        if not violates(error, "uq_task_user_assignment"):
+            raise
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already assigned")
+    record_audit(db, membership, "task.assigned", "task", task.id, {"user_id": str(data.user_id)})
+    db.commit()
+    return AssigneeResponse(user_id=data.user_id, email=email)
+
+
+@router.delete("/{task_id}/assignees/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def unassign_task(
+    task_id: uuid.UUID,
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    membership: Membership = Depends(get_current_membership),
+):
+    task = get_assignable_task(db, membership, task_id)
+    removed = db.query(TaskAssignment).filter(
+        TaskAssignment.task_id == task.id, TaskAssignment.user_id == user_id
+    ).delete(synchronize_session=False)
+    if not removed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not assigned")
+    record_audit(db, membership, "task.unassigned", "task", task.id, {"user_id": str(user_id)})
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

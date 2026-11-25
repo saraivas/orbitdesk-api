@@ -123,12 +123,15 @@ last owner can never be demoted or removed (`SELECT ... FOR UPDATE`, ADR
 `DELETE /tasks/{id}` (hard delete, with its assignments) check visibility
 first (`404`), then edit rights: owner, creator or assignee (`403`); deleting
 also needs `task.delete`. `task.updated` records changed field names, never
-values (ADR 0006).
+values (ADR 0006). `/tasks/{id}/assignees` lists (whoever sees the task),
+assigns and unassigns (only the creator or the owner, ADR 0002); only members
+of the same organization can be assigned, a duplicate is a `409` from
+`uq_task_user_assignment`, and `task.assigned`/`task.unassigned` are audited.
+`app/db/errors.py` (`violates`) turns a named constraint into a `409`.
 
-Not implemented yet, so it must not be described as existing: assigning
-tasks through the API, pending invitations, invitation emails, deleting an
-organization, `task.assigned`/`task.unassigned` audit entries, a README,
-rate limiting, caching, background jobs and deployment.
+Not implemented yet, so it must not be described as existing: pending
+invitations, invitation emails, deleting an organization, a README, rate
+limiting, caching, background jobs and deployment.
 
 ## Known limitations
 
