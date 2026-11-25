@@ -152,12 +152,27 @@ def delete_task(
     membership: Membership = Depends(require_permission("task.delete")),
 ):
     task = get_editable_task(db, membership, task_id)
+    task_type = task.type.value
     db.query(TaskAssignment).filter(TaskAssignment.task_id == task.id).delete(synchronize_session=False)
+    if not delete_task_row(db, task.id):
+        # Another request deleted it after we loaded it: same answer as a missing task.
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
     # Hard delete: the audit log has no foreign key to tasks, so this entry stays.
-    record_audit(db, membership, "task.deleted", "task", task.id, {"type": task.type.value})
-    db.delete(task)
+    record_audit(db, membership, "task.deleted", "task", task_id, {"type": task_type})
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def delete_task_row(db: Session, task_id: uuid.UUID) -> bool:
+    """Delete the task's row; False if another transaction deleted it first.
+
+    A concurrent DELETE waits for the first one's row lock, then finds no row.
+    Counting the deleted rows turns that into a 404. Deleting the loaded
+    object instead only warns on 0 rows, so both requests answered 204 and
+    each wrote a task.deleted audit entry.
+    """
+    return db.query(Task).filter(Task.id == task_id).delete(synchronize_session=False) == 1
 
 
 def get_assignable_task(db: Session, membership: Membership, task_id: uuid.UUID) -> Task:

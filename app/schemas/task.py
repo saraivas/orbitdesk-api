@@ -19,6 +19,10 @@ class TaskCreate(BaseModel):
 
 
 class TaskUpdate(BaseModel):
+    # An unknown field is a 422: silently ignoring {"type": ...} or a typo
+    # would answer 200 for a change that never happened.
+    model_config = ConfigDict(extra="forbid")
+
     title: Optional[str] = None
     description: Optional[str] = None
     status: Optional[TaskStatus] = None
