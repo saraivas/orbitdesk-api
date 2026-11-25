@@ -109,3 +109,24 @@ def test_a_member_pages_through_only_visible_tasks(client, org):
 @pytest.mark.parametrize("query", ["limit=0", "limit=101", "offset=-1"])
 def test_page_parameters_out_of_range_are_a_422(client, org, query):
     assert client.get(f"/tasks?{query}", headers=headers(org["owner"])).status_code == 422
+
+
+def test_a_page_past_the_end_is_empty_and_leaks_nothing(client, org):
+    # m2 sees one task. Hidden tasks must not fill pages beyond the visible ones,
+    # and the total still counts only what m2 may see.
+    response = client.get("/tasks?limit=10&offset=1", headers=headers(org["m2"]))
+
+    assert response.status_code == 200
+    assert response.json() == {"items": [], "total": 1}
+
+
+def test_the_list_is_newest_first(client, org):
+    body = client.get("/tasks", headers=headers(org["owner"])).json()
+
+    # The fixture creates the tasks in this order; the newest comes first.
+    assert [t["title"] for t in body["items"]] == [
+        "confidential_assigned_to_m1",
+        "confidential_by_admin",
+        "confidential_by_owner",
+        "standard_by_m2",
+    ]
