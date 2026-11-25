@@ -25,6 +25,10 @@ Managing members raises questions the permission strings do not answer:
 
 **Adding is auto-accept.** `POST /members` creates the membership at once for
 a user who already has an account. There is no invitation step and no email.
+Adding someone who is already a member is a `409`, decided by the unique
+constraint on `(user_id, organization_id)` at insert time, not by a read
+before the insert: two concurrent adds would both pass such a read, and the
+second would end in an unhandled error.
 
 **Who manages which role.** The owner manages every role. An admin adds and
 removes only `member`; adding or removing an admin or an owner, and changing

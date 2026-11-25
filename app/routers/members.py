@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -23,6 +24,10 @@ def count_owners_for_update(db: Session, organization_id: uuid.UUID) -> int:
     Two requests that each demote or remove one of the last two owners would
     both count two owners and both pass. With FOR UPDATE the second waits for
     the first to commit, then counts again and sees one (ADR 0005).
+
+    Callers load the target membership before calling this, without a lock.
+    That is still safe: after waiting, Postgres re-checks each locked row
+    against the WHERE, so an owner demoted meanwhile is no longer counted.
     """
     return len(
         db.query(Membership)
@@ -94,15 +99,16 @@ def add_member(
         # Known limitation: this tells the caller the email has no account (ADR 0005).
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    exists = db.query(Membership).filter(
-        Membership.organization_id == actor.organization_id, Membership.user_id == user.id
-    ).first()
-    if exists is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already a member")
-
     # Auto-accept: no invitation step, the membership exists at once.
     new = Membership(user_id=user.id, organization_id=actor.organization_id, role=data.role)
     db.add(new)
+    try:
+        db.flush()
+    except IntegrityError:
+        # uq_user_organization decides, not a read before the insert: two
+        # concurrent adds would both pass such a read (ADR 0005).
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already a member")
     record_audit(db, actor, "member.invited", "member", user.id, {"role": data.role.value})
     db.commit()
     db.refresh(new)
