@@ -1,7 +1,7 @@
 import redis
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
-from app.routers import auth, tasks
+from app.routers import auth, members, tasks
 
 app = FastAPI(title="Orbitdesk API")
 
@@ -22,3 +22,4 @@ def health():
 
 app.include_router(auth.router)
 app.include_router(tasks.router)
+app.include_router(members.router)

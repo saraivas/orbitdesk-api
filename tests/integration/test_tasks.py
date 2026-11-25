@@ -42,7 +42,7 @@ def test_an_organization_id_in_the_body_is_ignored(client, db_session):
 def test_who_can_create_which_type(client, db_session, role, task_type, expected):
     owner = register_and_login(client)
     caller = owner if role == MembershipRole.owner else join_as(
-        client, db_session, owner, role, email="someone@example.com"
+        client, owner, role, email="someone@example.com"
     )
 
     assert create_task(client, caller, type=task_type).status_code == expected
