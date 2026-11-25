@@ -94,6 +94,18 @@ def test_pages_do_not_overlap_and_the_total_ignores_the_page(client, org):
     assert not {t["id"] for t in first["items"]} & {t["id"] for t in second["items"]}
 
 
+def test_a_member_pages_through_only_visible_tasks(client, org):
+    # Hidden tasks sit between m1's visible ones. If the rule ran in Python
+    # after LIMIT, a page could come back empty or short (ADR 0004).
+    h = headers(org["m1"])
+
+    pages = [client.get(f"/tasks?limit=1&offset={i}", headers=h).json() for i in range(2)]
+
+    assert [len(p["items"]) for p in pages] == [1, 1]
+    assert {p["items"][0]["title"] for p in pages} == {"standard_by_m2", "confidential_assigned_to_m1"}
+    assert all(p["total"] == 2 for p in pages)
+
+
 @pytest.mark.parametrize("query", ["limit=0", "limit=101", "offset=-1"])
 def test_page_parameters_out_of_range_are_a_422(client, org, query):
     assert client.get(f"/tasks?{query}", headers=headers(org["owner"])).status_code == 422
