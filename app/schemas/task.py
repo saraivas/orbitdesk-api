@@ -44,3 +44,8 @@ class TaskResponse(BaseModel):
     updated_at: Optional[datetime]
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TaskPage(BaseModel):
+    items: list[TaskResponse]
+    total: int  # tasks the caller may see, across all pages
