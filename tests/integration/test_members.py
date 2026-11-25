@@ -6,7 +6,9 @@ import pytest
 from app.models.audit_log import AuditLog
 from app.models.membership import Membership, MembershipRole
 from app.models.task_assignment import TaskAssignment
-from app.routers.members import count_owners_for_update
+from sqlalchemy.exc import IntegrityError
+
+from app.routers.members import count_owners_for_update, is_duplicate_member
 from tests.conftest import TestingSessionLocal
 from tests.helpers import create_task, headers, join_as, register_and_login
 
@@ -59,6 +61,21 @@ def test_an_added_user_can_work_in_the_organization_at_once(client, org):
 def test_adding_an_unknown_email_or_an_existing_member_is_refused(client, org):
     assert add(client, org["owner"], "nobody@example.com").status_code == 404
     assert add(client, org["owner"], "member@example.com").status_code == 409
+
+
+def test_only_the_membership_constraint_counts_as_already_a_member(db_session, org):
+    """Real Postgres errors: a duplicate membership is one, a missing user is not."""
+    org_id = uuid.UUID(org["owner"]["org_id"])
+
+    def integrity_error(user_id):
+        db_session.add(Membership(user_id=user_id, organization_id=org_id, role=MembershipRole.member))
+        with pytest.raises(IntegrityError) as raised:
+            db_session.flush()
+        db_session.rollback()
+        return raised.value
+
+    assert is_duplicate_member(integrity_error(uuid.UUID(org["member"]["user_id"])))
+    assert not is_duplicate_member(integrity_error(uuid.uuid4()))  # foreign key, not a duplicate
 
 
 @pytest.mark.parametrize(
