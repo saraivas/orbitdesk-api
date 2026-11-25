@@ -37,6 +37,11 @@ uvicorn app.main:app --reload
 pytest                                                        # uses TEST_DATABASE_URL and TEST_REDIS_URL
 ```
 
+Test results for a pull request come from the `test` check of the CI
+workflow (`.github/workflows/ci.yml`), which runs `pytest` against real
+Postgres and Redis. The `@claude` review job has no database and cannot run
+the suite: read that check instead of treating the results as unverified.
+
 **Never point `TEST_DATABASE_URL` at a database you care about.** The test
 fixtures create and drop every table on each test. `tests/conftest.py` refuses
 to run unless the database name ends with `_test`. `DATABASE_URL` is the
@@ -105,9 +110,12 @@ unavailable. An `X-Organization-Id` that is not a UUID is a `422`, and an
 access token whose `sub` is not a UUID is a `401`. `POST /tasks` writes a
 `task.created` audit entry in the same transaction as the task, through
 `record_audit` in `app/core/audit.py` (it adds, never commits); the entry
-keeps the task type, never the title.
+keeps the task type, never the title. `GET /tasks` (with `limit`/`offset` and
+a `total`) and `GET /tasks/{id}` return only the tasks the caller may see:
+the rule is SQL in `visible_tasks`, shared by list, total and detail, and a
+hidden task is a `404` like a missing one (ADR 0004).
 
-Not implemented yet, so it must not be described as existing: reading, updating or
+Not implemented yet, so it must not be described as existing: updating or
 deleting tasks, task assignment, audit entries for any action other than
 `task.created`, a README, rate limiting, caching, background jobs and
 deployment.
@@ -122,3 +130,5 @@ deployment.
   `type: "confidential"`, so it reveals that a confidential task exists.
   Nothing reads `AuditLog` today; any endpoint that does must apply the
   confidential-task rules of ADR 0002 first.
+- Task visibility is enforced in application code only (ADR 0004). Any new
+  query on `tasks` must start from `visible_tasks`, or it bypasses the rule.
