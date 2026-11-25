@@ -119,12 +119,16 @@ adds (auto-accept, existing accounts only), changes roles and removes
 members, and lets a member leave; an admin manages only `member`, and the
 last owner can never be demoted or removed (`SELECT ... FOR UPDATE`, ADR
 0005). Removing a member deletes their assignments in that organization.
+`PATCH /tasks/{id}` (title, description, status; omitted fields unchanged) and
+`DELETE /tasks/{id}` (hard delete, with its assignments) check visibility
+first (`404`), then edit rights: owner, creator or assignee (`403`); deleting
+also needs `task.delete`. `task.updated` records changed field names, never
+values (ADR 0006).
 
-Not implemented yet, so it must not be described as existing: updating or
-deleting tasks, assigning tasks, pending invitations, invitation emails,
-deleting an organization, audit entries other than `task.created` and the
-`member.*` actions, a README, rate limiting, caching, background jobs and
-deployment.
+Not implemented yet, so it must not be described as existing: assigning
+tasks through the API, pending invitations, invitation emails, deleting an
+organization, `task.assigned`/`task.unassigned` audit entries, a README,
+rate limiting, caching, background jobs and deployment.
 
 ## Known limitations
 

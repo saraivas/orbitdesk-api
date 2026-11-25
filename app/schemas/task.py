@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from app.models.task import TaskStatus, TaskType
 
 
@@ -31,6 +31,15 @@ class TaskUpdate(BaseModel):
         if not value.strip():
             raise ValueError("Title cannot be blank")
         return value.strip()
+
+    @model_validator(mode="after")
+    def required_fields_are_not_cleared(self) -> "TaskUpdate":
+        # Omitted means "leave as is"; an explicit null means "clear", which
+        # only the description allows (the columns are NOT NULL).
+        for field in ("title", "status"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} cannot be null")
+        return self
 
 
 class TaskResponse(BaseModel):
