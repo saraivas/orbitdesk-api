@@ -52,8 +52,12 @@ def test_only_the_owner_may_delete_the_organization(client):
     assert client.get("/tasks", headers=headers(owner)).status_code == 200
 
 
-def test_deleting_an_already_deleted_organization_reports_nothing_deleted(client):
-    """Two deletes that both passed the membership check: only the first one counts."""
+def test_the_update_guard_skips_an_organization_that_is_already_deleted(client):
+    """The deleted_at IS NULL guard: a second soft delete matches no row.
+
+    Both calls run one after the other in one session, so this proves the
+    guard, not the lock wait between two concurrent requests (ADR 0007).
+    """
     owner = register_and_login(client, email="owner@example.com", org="Acme")
     org_id = uuid.UUID(owner["org_id"])
     db = TestingSessionLocal()
