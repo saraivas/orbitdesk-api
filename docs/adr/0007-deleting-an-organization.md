@@ -4,6 +4,11 @@
 
 Accepted
 
+**Update:** the "Concurrent deletes" paragraph describes how Postgres handles
+two deletes at once. The test only covers the `deleted_at IS NULL` guard, by
+running two soft deletes one after the other; no test runs two concurrent
+requests.
+
 ## Context
 
 An owner who wants to leave can promote another member to owner and then

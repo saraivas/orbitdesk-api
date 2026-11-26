@@ -140,8 +140,8 @@ answers the same `403` as for an unknown one, and `GET /organizations` leaves
 them out (ADR 0007).
 
 Not implemented yet, so it must not be described as existing: pending
-invitations, invitation emails, restoring or hard-deleting an organization, a README, rate
-limiting, caching, background jobs and deployment.
+invitations, invitation emails, restoring or hard-deleting an organization,
+a README, rate limiting, caching, background jobs and deployment.
 
 ## Known limitations
 
