@@ -35,6 +35,13 @@ def test_status_filter_and_total_count_only_matching_tasks(client, tasks_org):
     assert "standard_by_m2" not in titles(client, tasks_org["owner"], status="todo")
 
 
+def test_the_filtered_total_counts_every_page_not_just_this_one(client, tasks_org):
+    # The owner created 2 confidential tasks; a page of 1 must still report 2.
+    response = client.get("/tasks", params={"created_by": "me", "limit": 1}, headers=headers(tasks_org["owner"]))
+    assert len(response.json()["items"]) == 1
+    assert response.json()["total"] == 2
+
+
 def test_filters_combine(client, tasks_org):
     owner = tasks_org["owner"]
     assert titles(client, owner, created_by="me", assignee=tasks_org["m1"]["user_id"]) == ["confidential_assigned_to_m1"]

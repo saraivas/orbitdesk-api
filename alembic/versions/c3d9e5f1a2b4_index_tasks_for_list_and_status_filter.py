@@ -3,6 +3,10 @@
 Replaces ix_tasks_organization_id: ix_tasks_org_created starts with the same
 column, so it serves every lookup the old index did.
 
+The indexes are built without CONCURRENTLY, so writes to tasks wait until
+they finish. That is fine with no deployment and small tables (ADR 0008); on
+a large live table, build them with CONCURRENTLY outside a transaction.
+
 Revision ID: c3d9e5f1a2b4
 Revises: b7e1c2d4a9f0
 Create Date: 2026-11-25 22:00:00

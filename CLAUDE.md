@@ -118,7 +118,7 @@ hidden task is a `404` like a missing one (ADR 0004). `GET /tasks` also
 filters by `status`, `assignee` and `created_by` (a UUID or `me`); the filters
 only narrow `visible_tasks`, the `total` counts filtered tasks, and an unknown
 user is an empty list. `ix_tasks_org_created` and `ix_tasks_org_status_created`
-serve the list order and the status filter. `/members` lists,
+serve the list order and the status filter (ADR 0008). `/members` lists,
 adds (auto-accept, existing accounts only), changes roles and removes
 members, and lets a member leave; an admin manages only `member`, and the
 last owner can never be demoted or removed (`SELECT ... FOR UPDATE`, ADR
@@ -159,6 +159,9 @@ a README, rate limiting, caching, background jobs and deployment.
   confidential-task rules of ADR 0002 first.
 - Task visibility is enforced in application code only (ADR 0004). Any new
   query on `tasks` must start from `visible_tasks`, or it bypasses the rule.
+- Migrations build indexes without `CONCURRENTLY`, so they block writes to
+  the table while they run (ADR 0008). Fine with no deployment; a large live
+  table would need `CONCURRENTLY` outside a transaction.
 - A deleted organization is hidden only by `get_current_membership` and the
   filter in `GET /organizations` (ADR 0007). A new query that reads
   `organizations` or tenant data without that dependency must filter
