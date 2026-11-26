@@ -28,6 +28,10 @@ class MyOrganizationResponse(OrganizationResponse):
     role: MembershipRole
 
 
+class OrganizationDelete(BaseModel):
+    confirm_name: str
+
+
 class RegisterResponse(BaseModel):
     user_id: uuid.UUID
     email: EmailStr

@@ -12,3 +12,5 @@ class Organization(Base):
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    # Set when the owner deletes the organization (ADR 0007); the rows are kept.
+    deleted_at = Column(DateTime(timezone=True), nullable=True)

@@ -11,6 +11,7 @@ from app.core.redis import get_redis
 from app.core.sessions import is_session_active
 from app.models.user import User
 from app.models.membership import Membership
+from app.models.organization import Organization
 
 bearer_scheme = HTTPBearer()
 
@@ -70,11 +71,16 @@ def get_current_membership(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Membership:
+    # Every organization-scoped route passes here, so filtering deleted
+    # organizations once hides all their data, with the same 403 as an
+    # unknown organization (ADR 0007).
     membership = (
         db.query(Membership)
+        .join(Organization, Organization.id == Membership.organization_id)
         .filter(
             Membership.user_id == current_user.id,
             Membership.organization_id == x_organization_id,
+            Organization.deleted_at.is_(None),
         )
         .first()
     )

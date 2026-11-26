@@ -131,10 +131,16 @@ of the same organization can be assigned, a duplicate is a `409` from
 `uq_task_user_assignment`, and `task.assigned`/`task.unassigned` are audited.
 `app/db/errors.py` (`violates`) turns a named constraint into a `409`.
 `GET /organizations` lists the caller's organizations with their role in
-each; it needs a login but no `X-Organization-Id`.
+each; it needs a login but no `X-Organization-Id`. `DELETE /organization`
+(owner only, `organization.delete`) soft-deletes the request's organization
+when `confirm_name` repeats its name exactly (else `422`): it sets
+`deleted_at`, keeps every row and writes `organization.deleted`.
+`get_current_membership` ignores deleted organizations, so every scoped route
+answers the same `403` as for an unknown one, and `GET /organizations` leaves
+them out (ADR 0007).
 
 Not implemented yet, so it must not be described as existing: pending
-invitations, invitation emails, deleting an organization, a README, rate
+invitations, invitation emails, restoring or hard-deleting an organization, a README, rate
 limiting, caching, background jobs and deployment.
 
 ## Known limitations
@@ -149,6 +155,11 @@ limiting, caching, background jobs and deployment.
   confidential-task rules of ADR 0002 first.
 - Task visibility is enforced in application code only (ADR 0004). Any new
   query on `tasks` must start from `visible_tasks`, or it bypasses the rule.
+- A deleted organization is hidden only by `get_current_membership` and the
+  filter in `GET /organizations` (ADR 0007). A new query that reads
+  `organizations` or tenant data without that dependency must filter
+  `deleted_at`. Deleted data is never erased, so an erasure request
+  (LGPD/GDPR) cannot be met yet.
 - Adding a member with an email that has no account is a `404`, so anyone can
   learn whether an email is registered (ADR 0005). Pending invitations would
   close this.
