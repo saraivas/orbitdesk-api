@@ -1,3 +1,4 @@
+import threading
 import uuid
 
 import pytest
@@ -5,6 +6,8 @@ import pytest
 from app.models.audit_log import AuditLog
 from app.models.task import Task
 from app.models.task_assignment import TaskAssignment
+from app.routers.tasks import delete_task_row
+from tests.conftest import TestingSessionLocal
 from tests.helpers import headers
 
 
@@ -68,10 +71,13 @@ def test_null_clears_the_description_but_not_the_title(client, tasks_org):
     assert patch(client, tasks_org, "m2", "standard_by_m2", {"status": None}).status_code == 422
 
 
-def test_the_type_cannot_be_changed(client, tasks_org):
-    body = patch(client, tasks_org, "m2", "standard_by_m2", {"type": "confidential"}).json()
+@pytest.mark.parametrize("body", [{"type": "confidential"}, {"titel": "typo"}])
+def test_an_unknown_or_read_only_field_is_a_422_not_silently_ignored(client, tasks_org, body):
+    response = patch(client, tasks_org, "m2", "standard_by_m2", body)
 
-    assert body["type"] == "standard"
+    assert response.status_code == 422
+    task = client.get(f"/tasks/{tasks_org['tasks']['standard_by_m2']}", headers=headers(tasks_org["m2"]))
+    assert task.json()["type"] == "standard"
 
 
 def test_an_edit_audits_the_changed_fields_not_their_values(client, db_session, tasks_org):
@@ -113,3 +119,29 @@ def test_deleting_removes_the_task_and_its_assignments_and_keeps_the_audit(clien
 def test_deleting_twice_is_a_404_the_second_time(client, tasks_org):
     assert delete(client, tasks_org, "owner", "standard_by_m2").status_code == 204
     assert delete(client, tasks_org, "owner", "standard_by_m2").status_code == 404
+
+
+def test_a_concurrent_second_delete_finds_no_row_instead_of_failing(client, tasks_org):
+    """Two deletes of one task at once: the second must see 0 rows, not crash.
+
+    Session 1 deletes the row without committing. Session 2's delete waits for
+    that lock and, once session 1 commits, reports that nothing was deleted,
+    which the endpoint turns into a 404.
+    """
+    task_id = uuid.UUID(tasks_org["tasks"]["standard_by_m2"])
+    s1, s2 = TestingSessionLocal(), TestingSessionLocal()
+    result = {}
+    try:
+        assert delete_task_row(s1, task_id)
+
+        waiter = threading.Thread(target=lambda: result.update(deleted=delete_task_row(s2, task_id)))
+        waiter.start()
+        waiter.join(timeout=1)
+        assert waiter.is_alive(), "the second delete did not wait for the first transaction's lock"
+
+        s1.commit()
+        waiter.join(timeout=5)
+        assert result == {"deleted": False}
+    finally:
+        s1.close()  # first: releases the row lock, so a still-waiting s2 can finish
+        s2.close()
