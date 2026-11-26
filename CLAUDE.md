@@ -55,8 +55,8 @@ otherwise.
 ## Layout
 
 - `app/main.py` creates the app and includes the routers.
-- `app/routers/auth.py`, `app/routers/tasks.py`, `app/routers/members.py`
-  hold the endpoints.
+- `app/routers/auth.py`, `app/routers/tasks.py`, `app/routers/members.py`,
+  `app/routers/organizations.py` hold the endpoints.
 - `app/deps.py` has `get_current_user`, `get_current_membership` (reads the
   `X-Organization-Id` header, see ADR 0001) and `require_permission`.
 - `app/core/permissions.py` maps roles to permission strings (ADR 0002).
@@ -130,6 +130,8 @@ assigns and unassigns (only the creator or the owner, ADR 0002); only members
 of the same organization can be assigned, a duplicate is a `409` from
 `uq_task_user_assignment`, and `task.assigned`/`task.unassigned` are audited.
 `app/db/errors.py` (`violates`) turns a named constraint into a `409`.
+`GET /organizations` lists the caller's organizations with their role in
+each; it needs a login but no `X-Organization-Id`.
 
 Not implemented yet, so it must not be described as existing: pending
 invitations, invitation emails, deleting an organization, a README, rate

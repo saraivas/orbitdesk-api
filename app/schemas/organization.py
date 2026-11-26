@@ -1,6 +1,8 @@
 import uuid
 from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 
+from app.models.membership import MembershipRole
+
 
 class UserRegisterWithOrg(BaseModel):
     email: EmailStr
@@ -20,6 +22,10 @@ class OrganizationResponse(BaseModel):
     name: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MyOrganizationResponse(OrganizationResponse):
+    role: MembershipRole
 
 
 class RegisterResponse(BaseModel):
