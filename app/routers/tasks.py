@@ -1,4 +1,5 @@
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import exists, or_
@@ -8,7 +9,7 @@ from app.db.errors import violates
 from app.db.session import get_db
 from app.deps import get_current_membership, require_permission
 from app.models.membership import Membership, MembershipRole
-from app.models.task import Task, TaskType
+from app.models.task import Task, TaskStatus, TaskType
 from app.models.task_assignment import TaskAssignment
 from app.models.user import User
 from app.core.audit import record_audit
@@ -76,10 +77,24 @@ def visible_tasks(db: Session, membership: Membership):
 def list_tasks(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    task_status: TaskStatus | None = Query(None, alias="status"),  # `status` is the fastapi module here
+    assignee: Literal["me"] | uuid.UUID | None = None,
+    created_by: Literal["me"] | uuid.UUID | None = None,
     db: Session = Depends(get_db),
     membership: Membership = Depends(get_current_membership),
 ):
+    # Filters only narrow visible_tasks: filtering by another user's
+    # assignments must not reveal tasks the caller cannot see (ADR 0004).
     query = visible_tasks(db, membership)
+    if task_status is not None:
+        query = query.filter(Task.status == task_status)
+    if created_by is not None:
+        query = query.filter(Task.created_by == (membership.user_id if created_by == "me" else created_by))
+    if assignee is not None:
+        query = query.filter(exists().where(
+            TaskAssignment.task_id == Task.id,
+            TaskAssignment.user_id == (membership.user_id if assignee == "me" else assignee),
+        ))
     items = (
         query.order_by(Task.created_at.desc(), Task.id)  # id breaks ties, so pages are stable
         .limit(limit)
