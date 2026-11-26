@@ -122,7 +122,9 @@ last owner can never be demoted or removed (`SELECT ... FOR UPDATE`, ADR
 `PATCH /tasks/{id}` (title, description, status; omitted fields unchanged) and
 `DELETE /tasks/{id}` (hard delete, with its assignments) check visibility
 first (`404`), then edit rights: owner, creator or assignee (`403`); deleting
-also needs `task.delete`. `task.updated` records changed field names, never
+also needs `task.delete`. A `PATCH` with an unknown or read-only field is a
+`422`. A second concurrent `DELETE` of the same task is a `404` and writes no
+second `task.deleted`. `task.updated` records changed field names, never
 values (ADR 0006). `/tasks/{id}/assignees` lists (whoever sees the task),
 assigns and unassigns (only the creator or the owner, ADR 0002); only members
 of the same organization can be assigned, a duplicate is a `409` from

@@ -143,6 +143,5 @@ def test_a_concurrent_second_delete_finds_no_row_instead_of_failing(client, task
         waiter.join(timeout=5)
         assert result == {"deleted": False}
     finally:
-        s2.rollback()
-        s1.close()
+        s1.close()  # first: releases the row lock, so a still-waiting s2 can finish
         s2.close()
