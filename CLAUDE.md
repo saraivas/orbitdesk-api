@@ -114,7 +114,11 @@ access token whose `sub` is not a UUID is a `401`. `POST /tasks` writes a
 keeps the task type, never the title. `GET /tasks` (with `limit`/`offset` and
 a `total`) and `GET /tasks/{id}` return only the tasks the caller may see:
 the rule is SQL in `visible_tasks`, shared by list, total and detail, and a
-hidden task is a `404` like a missing one (ADR 0004). `/members` lists,
+hidden task is a `404` like a missing one (ADR 0004). `GET /tasks` also
+filters by `status`, `assignee` and `created_by` (a UUID or `me`); the filters
+only narrow `visible_tasks`, the `total` counts filtered tasks, and an unknown
+user is an empty list. `ix_tasks_org_created` and `ix_tasks_org_status_created`
+serve the list order and the status filter. `/members` lists,
 adds (auto-accept, existing accounts only), changes roles and removes
 members, and lets a member leave; an admin manages only `member`, and the
 last owner can never be demoted or removed (`SELECT ... FOR UPDATE`, ADR
